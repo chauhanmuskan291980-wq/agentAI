@@ -38,7 +38,6 @@ if radio_opt.index(selected_opt) == 1:
     db_uri = MYSQL
     mysql_host = st.sidebar.text_input("MySQL Host")
     mysql_user = st.sidebar.text_input("MySQL User")
-    mysql_password = st.sidebar.text_input("MySQL Password", type="password")
     mysql_db = st.sidebar.text_input("MySQL Database")
 else:
     db_uri = LOCALDB
@@ -75,12 +74,12 @@ def configure_db(db_uri, mysql_host=None, mysql_user=None, mysql_password=None, 
         )
 
     elif db_uri == MYSQL:
-        if not (mysql_host and mysql_user and mysql_password and mysql_db):
+        if not (mysql_host and mysql_user and mysql_db):
             st.error("Please provide all MySQL connection details")
             st.stop()
         return SQLDatabase(
             create_engine(
-                f"mysql+mysqlconnector://{mysql_user}:{quote_plus(mysql_password)}@{mysql_host}/{mysql_db}"
+                f"mysql+mysqlconnector://{mysql_user}@{mysql_host}/{mysql_db}"
             )
         )
 
@@ -97,6 +96,9 @@ agent = create_sql_agent(
     llm=llm,
     toolkit=toolkit,
     verbose=True,
+    agent_executor_kwargs={
+        "return_intermediate_steps": True
+    }
 )
 
 
@@ -118,3 +120,18 @@ if user_query:
 
         except Exception as e:
             st.error(f"Error: {e}")
+             
+        # Show SQL trace / citation
+        with st.expander("View SQL query and database steps"):
+            for step in response.get("intermediate_steps", []):
+                action = step[0]
+                observation = step[1]
+
+                st.markdown(f"**Tool used:** `{action.tool}`")
+
+                if action.tool_input:
+                    st.markdown("**Input:**")
+                    st.code(str(action.tool_input), language="sql")
+
+                st.markdown("**Result:**")
+                st.write(observation)
